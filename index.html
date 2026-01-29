@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Evidences – Démo santé : décisions et conséquences</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: #0b0c10; color: #e8e8e8; }
+    header { padding: 18px 20px; border-bottom: 1px solid #222; background: #0b0c10; position: sticky; top: 0; z-index: 10; }
+    header h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: .2px; }
+    header p { margin: 6px 0 0; color: #b7b7b7; font-size: 13px; line-height: 1.35; max-width: 1100px; }
+    .wrap { display: grid; grid-template-columns: 360px 1fr; gap: 16px; padding: 16px; }
+    .card { background: #12131a; border: 1px solid #242633; border-radius: 14px; padding: 14px; box-shadow: 0 12px 30px rgba(0,0,0,.25); }
+    .card h2 { margin: 0 0 10px; font-size: 14px; font-weight: 650; }
+    .row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; margin: 10px 0; }
+    .row label { font-size: 13px; color: #d6d6d6; }
+    .row .val { font-variant-numeric: tabular-nums; color: #b7b7b7; font-size: 13px; }
+    input[type="range"] { width: 100%; }
+    select, button { width: 100%; padding: 10px 10px; border-radius: 12px; border: 1px solid #2c2f3d; background: #0f1016; color: #e8e8e8; }
+    button { cursor: pointer; font-weight: 650; }
+    button:hover { border-color: #4a4f66; }
+    .hint { margin-top: 12px; padding: 10px 10px; border-radius: 12px; border: 1px solid #2c2f3d; background: #0f1016; color: #cfcfcf; font-size: 13px; line-height: 1.35; }
+    .gridCharts { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .mini { color: #9aa0a6; font-size: 12px; }
+    .badge { display:inline-block; padding: 3px 8px; border: 1px solid #2c2f3d; border-radius: 999px; font-size: 12px; color:#cfcfcf; margin-left: 6px; }
+    .footer { padding: 0 16px 18px; color: #8f95a0; font-size: 12px; line-height: 1.35; }
+    a { color: #b7d2ff; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Démo Evidences (santé) — Décisions, incertitude, conséquences</h1>
+    <p>
+      Outil pédagogique : ce simulateur ne “prévoit” pas le réel. Il illustre comment des choix (plus ou moins alignés avec l’évidence)
+      modifient une trajectoire <span class="badge">avec incertitude</span>. Les bandes montrent un intervalle plausible (10–90%).
+    </p>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <h2>Paramètres & mode de décision</h2>
+
+      <div class="row">
+        <label for="mode">Mode</label>
+        <div class="val" id="modeVal"></div>
+      </div>
+      <select id="mode">
+        <option value="evidence">Evidence-based</option>
+        <option value="opinion">Opinion-based</option>
+        <option value="nosci">No science</option>
+      </select>
+
+      <div class="row" style="margin-top:14px;">
+        <label>Vaccination (%)</label>
+        <div class="val" id="vaxVal"></div>
+      </div>
+      <input id="vax" type="range" min="0" max="95" step="1" value="65" />
+
+      <div class="row">
+        <label>Réduction de contacts (%)</label>
+        <div class="val" id="distVal"></div>
+      </div>
+      <input id="dist" type="range" min="0" max="70" step="1" value="25" />
+
+      <div class="row">
+        <label>Délai de réaction (jours)</label>
+        <div class="val" id="delayVal"></div>
+      </div>
+      <input id="delay" type="range" min="0" max="28" step="1" value="7" />
+
+      <div class="row">
+        <label>Capacité hospitalière (lits)</label>
+        <div class="val" id="capVal"></div>
+      </div>
+      <input id="cap" type="range" min="200" max="6000" step="50" value="1800" />
+
+      <div class="row">
+        <label>Sévérité (IFR ‰)</label>
+        <div class="val" id="ifrVal"></div>
+      </div>
+      <input id="ifr" type="range" min="0.2" max="6.0" step="0.1" value="1.2" />
+
+      <div class="row">
+        <label>Horizon (jours)</label>
+        <div class="val" id="daysVal"></div>
+      </div>
+      <input id="days" type="range" min="60" max="365" step="5" value="180" />
+
+      <div class="row">
+        <label>Simulations (Monte-Carlo)</label>
+        <div class="val" id="mcVal"></div>
+      </div>
+      <input id="mc" type="range" min="60" max="600" step="20" value="260" />
+
+      <div style="margin-top:12px;">
+        <button id="run">Simuler</button>
+      </div>
+
+      <div class="hint" id="narrative"></div>
+      <div class="mini" style="margin-top:10px;">
+        Astuce : pousse “No science”, mets vaccination basse et délai haut — observe la capacité hospitalière.
+      </div>
+    </div>
+
+    <div class="gridCharts">
+      <div class="card">
+        <h2>Infections actives</h2>
+        <div id="chartI" style="height:320px;"></div>
+      </div>
+      <div class="card">
+        <h2>Hospitalisations (et capacité)</h2>
+        <div id="chartH" style="height:320px;"></div>
+      </div>
+      <div class="card">
+        <h2>Décès cumulés</h2>
+        <div id="chartD" style="height:320px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Note méthodo.</strong> Modèle jouet SIR discret avec délais (hosp/décès) et paramètres incertains.
+    L’objectif est l’intuition, pas la prédiction. Si tu veux, on peut ensuite brancher des paramètres “sourcés”
+    (méta-analyses, estimations R0, VE, délais) et afficher des liens vers sources.
+  </div>
+
+<script>
+  // --- Utilities ---
+  function clamp(x, a, b){ return Math.max(a, Math.min(b, x)); }
+  function quantile(sortedArr, q){
+    const n = sortedArr.length;
+    if(n === 0) return NaN;
+    const pos = (n - 1) * q;
+    const base = Math.floor(pos);
+    const rest = pos - base;
+    if(sortedArr[base + 1] !== undefined){
+      return sortedArr[base] + rest * (sortedArr[base + 1] - sortedArr[base]);
+    }
+    return sortedArr[base];
+  }
+  function median(sortedArr){ return quantile(sortedArr, 0.5); }
+  function rndn(){
+    // Box-Muller
+    let u = 0, v = 0;
+    while(u === 0) u = Math.random();
+    while(v === 0) v = Math.random();
+    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  }
+  function lognormal(mean, sigma){
+    // mean is approx median in log space; this is a quick helper
+    return Math.exp(Math.log(mean) + sigma * rndn());
+  }
+
+  // --- UI elements ---
+  const el = (id) => document.getElementById(id);
+  const mode = el("mode"), vax = el("vax"), dist = el("dist"), delay = el("delay"), cap = el("cap"), ifr = el("ifr"), days = el("days"), mc = el("mc");
+  const runBtn = el("run");
+
+  function syncLabels(){
+    el("modeVal").textContent = mode.options[mode.selectedIndex].text;
+    el("vaxVal").textContent = `${vax.value}%`;
+    el("distVal").textContent = `${dist.value}%`;
+    el("delayVal").textContent = `${delay.value} j`;
+    el("capVal").textContent = `${cap.value}`;
+    el("ifrVal").textContent = `${Number(ifr.value).toFixed(1)} ‰`;
+    el("daysVal").textContent = `${days.value} j`;
+    el("mcVal").textContent = `${mc.value}`;
+  }
+
+  function narrativeText(){
+    const m = mode.value;
+    const v = Number(vax.value), d = Number(dist.value), lag = Number(delay.value);
+    if(m === "evidence"){
+      return `Mode <b>Evidence-based</b> : le système <i>surveille</i> et ajuste plus vite.
+              Ici, vous supposez qu’une réponse rapide (délai ${lag} j) et une adhésion aux mesures (${d}%) réduisent
+              la pression hospitalière, mais l’incertitude demeure.`;
+    } else if(m === "opinion"){
+      return `Mode <b>Opinion-based</b> : hypothèses plus optimistes, ajustements plus lents.
+              Implicitement, on sous-estime les scénarios défavorables (variance). Avec ${v}% de vaccination et ${d}% de réduction de contacts,
+              regardez l’amplitude de l’incertitude et les dépassements de capacité.`;
+    }
+    return `Mode <b>No science</b> : on agit tard (ou pas), et on “parie” sur un scénario favorable.
+            Implicitement, on suppose que le risque est faible ou que “ça va passer”.
+            La conséquence typique est une augmentation des scénarios extrêmes (queues épaisses).`;
+  }
+
+  [mode, vax, dist, delay, cap, ifr, days, mc].forEach(x => x.addEventListener("input", () => {
+    syncLabels();
+    el("narrative").innerHTML = narrativeText();
+  }));
+
+  // --- Simulation model ---
+  function simulateOnce(params){
+    const {
+      N, days, vaxRate, contactRed, reactDelay,
+      hospCap, ifrPerThousand,
+      modeKey
+    } = params;
+
+    // Base epidemiology
+    const gamma = 1/6.0; // recovery rate (1/infectious period)
+    const I0 = 400;      // initial infected
+    let S = N - I0;
+    let I = I0;
+    let R = 0;
+
+    // Uncertain parameters
+    // R0 baseline around 2.2–3.2 with some uncertainty
+    let R0 = lognormal(2.6, 0.18);
+    R0 = clamp(R0, 1.4, 6.0);
+
+    // Vaccine effectiveness against infection (rough, uncertain)
+    let VEinf = clamp(0.55 + 0.10*rndn(), 0.15, 0.85);
+    // Vaccine effectiveness against severe outcomes
+    let VEsev = clamp(0.75 + 0.08*rndn(), 0.40, 0.95);
+
+    // Adherence uncertainty (contact reduction effective)
+    let adher = clamp((contactRed/100) * (0.85 + 0.25*rndn()), 0.0, 0.8);
+
+    // Behavioural / policy response depending on mode: how strongly beta is reduced after delay
+    // evidence: stronger & more reliable response; opinion: weaker; nosci: weak/chaotic
+    let responseStrength = 0.0;
+    let responseNoise = 0.0;
+    if(modeKey === "evidence"){
+      responseStrength = 0.55;
+      responseNoise = 0.10;
+    } else if(modeKey === "opinion"){
+      responseStrength = 0.30;
+      responseNoise = 0.20;
+      // optimism bias: underestimates R0 slightly
+      R0 *= 0.95;
+    } else {
+      responseStrength = 0.15;
+      responseNoise = 0.30;
+      // sometimes: denial -> even lower perceived risk (but real dynamics unchanged)
+    }
+
+    // Severity / healthcare
+    const ifr = (ifrPerThousand/1000.0); // convert ‰ to proportion
+    // hospitalisation rate among infections (toy)
+    let hospRate = clamp(0.010 + 0.004*rndn(), 0.003, 0.030);
+    // vaccination reduces severity
+    hospRate *= (1 - vaxRate * VEsev);
+
+    const deathRate = clamp(ifr * (1 - vaxRate * VEsev), 0.00005, 0.02);
+
+    // Delay kernels (toy): hosp after ~8 days, deaths after ~18 days
+    const hospLag = 8;
+    const deathLag = 18;
+    const newInfHist = Array(days+1).fill(0);
+
+    const active = Array(days+1).fill(0);
+    const hosp = Array(days+1).fill(0);
+    const deadCum = Array(days+1).fill(0);
+
+    // beta baseline
+    // R0 = beta/gamma * (S/N approx 1 early)
+    let beta0 = R0 * gamma;
+
+    let deaths = 0;
+
+    for(let t=0; t<=days; t++){
+      // Policy / behaviour effect kicks in after reactDelay:
+      let policyFactor = 1.0;
+      if(t >= reactDelay){
+        // Evidence-based reduces beta more consistently
+        const eff = clamp(adher * (responseStrength + responseNoise*rndn()), 0.0, 0.85);
+        policyFactor = 1.0 - eff;
+      } else {
+        // before reaction, maybe some baseline mild reduction
+        const baseline = (modeKey === "evidence") ? 0.05 : (modeKey === "opinion" ? 0.02 : 0.0);
+        policyFactor = 1.0 - baseline;
+      }
+
+      // Season/variant drift (slow)
+      const drift = 1.0 + 0.10*Math.sin(2*Math.PI*t/120.0) + 0.05*rndn();
+      const beta = clamp(beta0 * drift * policyFactor, 0.02, 2.0);
+
+      // Effective susceptible reduced by vaccination (toy: susceptibility reduction VEinf)
+      const effS = S * (1 - vaxRate*VEinf);
+
+      // New infections
+      const newInf = clamp(beta * I * effS / N, 0, S);
+      newInfHist[t] = newInf;
+
+      // SIR updates (discrete Euler)
+      const rec = gamma * I;
+      S -= newInf;
+      I += newInf - rec;
+      R += rec;
+
+      active[t] = I;
+
+      // Hospitalisations from infections hospLag days ago
+      if(t - hospLag >= 0){
+        hosp[t] = newInfHist[t - hospLag] * hospRate * N / N; // keep simple
+      } else {
+        hosp[t] = 0;
+      }
+
+      // Deaths from infections deathLag days ago
+      if(t - deathLag >= 0){
+        const dth = newInfHist[t - deathLag] * deathRate;
+        deaths += dth;
+      }
+      deadCum[t] = deaths;
+    }
+
+    return { active, hosp, deadCum, hospCap };
+  }
+
+  function summariseEnsemble(paths){
+    // paths: array of arrays same length
+    const T = paths[0].length;
+    const q10 = Array(T).fill(0), q50 = Array(T).fill(0), q90 = Array(T).fill(0);
+    for(let t=0; t<T; t++){
+      const vals = paths.map(p => p[t]).sort((a,b)=>a-b);
+      q10[t] = quantile(vals, 0.10);
+      q50[t] = quantile(vals, 0.50);
+      q90[t] = quantile(vals, 0.90);
+    }
+    return { q10, q50, q90 };
+  }
+
+  function plotBand(divId, x, stats, title, yLabel, extraTraces=[]){
+    const { q10, q50, q90 } = stats;
+    const traceLow = { x, y: q10, type: "scatter", mode: "lines", line: { width: 0 }, name: "10%" , hoverinfo:"skip" };
+    const traceHigh = { x, y: q90, type: "scatter", mode: "lines", fill: "tonexty", line: { width: 0 }, name: "90%", hoverinfo:"skip" };
+    const traceMed = { x, y: q50, type: "scatter", mode: "lines", line: { width: 2 }, name: "Médiane" };
+
+    const layout = {
+      paper_bgcolor: "#12131a",
+      plot_bgcolor: "#12131a",
+      font: { color: "#e8e8e8" },
+      margin: { l: 55, r: 20, t: 20, b: 45 },
+      xaxis: { title: "Jour", gridcolor: "#232538", zeroline: false },
+      yaxis: { title: yLabel, gridcolor: "#232538", zeroline: false },
+      showlegend: true,
+      legend: { orientation: "h", y: -0.18, x: 0 },
+    };
+
+    Plotly.newPlot(divId, [traceLow, traceHigh, traceMed, ...extraTraces], layout, {displayModeBar:false, responsive:true});
+  }
+
+  async function runSimulation(){
+    syncLabels();
+    el("narrative").innerHTML = narrativeText();
+
+    const N = 1_000_000;
+    const T = Number(days.value);
+    const vaxRate = Number(vax.value)/100;
+    const contactRed = Number(dist.value);
+    const reactDelay = Number(delay.value);
+    const hospCap = Number(cap.value);
+    const ifrPerThousand = Number(ifr.value);
+    const M = Number(mc.value);
+    const modeKey = mode.value;
+
+    // Run ensemble
+    const activePaths = [];
+    const hospPaths = [];
+    const deadPaths = [];
+
+    // Small UI hint
+    runBtn.textContent = "Simulation…";
+    runBtn.disabled = true;
+
+    for(let m=0; m<M; m++){
+      const out = simulateOnce({ N, days: T, vaxRate, contactRed, reactDelay, hospCap, ifrPerThousand, modeKey });
+      activePaths.push(out.active);
+      hospPaths.push(out.hosp);
+      deadPaths.push(out.deadCum);
+
+      // Yield every ~40 runs to keep UI responsive
+      if(m % 40 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+
+    const x = Array.from({length: T+1}, (_,i)=>i);
+
+    const Istats = summariseEnsemble(activePaths);
+    const Hstats = summariseEnsemble(hospPaths);
+    const Dstats = summariseEnsemble(deadPaths);
+
+    // Capacity line for hospitalisations
+    const capTrace = {
+      x, y: x.map(_ => hospCap),
+      type: "scatter", mode: "lines",
+      line: { dash: "dash", width: 2 },
+      name: "Capacité"
+    };
+
+    plotBand("chartI", x, Istats, "Infections actives", "Personnes", []);
+    plotBand("chartH", x, Hstats, "Hospitalisations", "Patients", [capTrace]);
+    plotBand("chartD", x, Dstats, "Décès cumulés", "Personnes", []);
+
+    runBtn.textContent = "Simuler";
+    runBtn.disabled = false;
+  }
+
+  runBtn.addEventListener("click", runSimulation);
+
+  // Init
+  syncLabels();
+  el("narrative").innerHTML = narrativeText();
+  runSimulation();
+</script>
+</body>
+</html>
